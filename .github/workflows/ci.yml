@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04  # Use 22.04 for better PyGObject compatibility
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
@@ -21,24 +21,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3-gi \
-            python3-pyatspi \
-            gir1.2-atspi-2.0 \
-            gir1.2-gtk-3.0 \
-            at-spi2-core \
-            libgirepository1.0-dev \
-            libcairo2-dev \
-            pkg-config \
-            python3-dev
-
-      - name: Install Python dependencies
+      - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio mcp pycairo PyGObject
+          pip install pytest pytest-asyncio
 
       - name: Run tests
         run: |
