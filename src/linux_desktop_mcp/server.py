@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import TextContent, Tool, ToolAnnotations
 
 from .atspi_bridge import ATSPI_AVAILABLE, ATSPIBridge
 from .detection import PlatformCapabilities, detect_capabilities
@@ -91,6 +91,7 @@ class LinuxDesktopMCPServer:
                             },
                         },
                     },
+                    annotations=ToolAnnotations(readOnlyHint=True),
                 ),
                 Tool(
                     name="desktop_find",
@@ -110,6 +111,7 @@ class LinuxDesktopMCPServer:
                         },
                         "required": ["query"],
                     },
+                    annotations=ToolAnnotations(readOnlyHint=True),
                 ),
                 Tool(
                     name="desktop_click",
@@ -149,6 +151,7 @@ class LinuxDesktopMCPServer:
                             },
                         },
                     },
+                    annotations=ToolAnnotations(destructiveHint=True),
                 ),
                 Tool(
                     name="desktop_type",
@@ -178,6 +181,7 @@ class LinuxDesktopMCPServer:
                         },
                         "required": ["text"],
                     },
+                    annotations=ToolAnnotations(destructiveHint=True),
                 ),
                 Tool(
                     name="desktop_key",
@@ -197,11 +201,13 @@ class LinuxDesktopMCPServer:
                         },
                         "required": ["key"],
                     },
+                    annotations=ToolAnnotations(destructiveHint=True),
                 ),
                 Tool(
                     name="desktop_capabilities",
                     description="Get information about available desktop automation capabilities.",
                     inputSchema={"type": "object", "properties": {}},
+                    annotations=ToolAnnotations(readOnlyHint=True),
                 ),
                 Tool(
                     name="desktop_context",
@@ -218,6 +224,7 @@ class LinuxDesktopMCPServer:
                             }
                         },
                     },
+                    annotations=ToolAnnotations(readOnlyHint=True),
                 ),
                 Tool(
                     name="desktop_target_window",
@@ -248,6 +255,7 @@ class LinuxDesktopMCPServer:
                             },
                         },
                     },
+                    annotations=ToolAnnotations(idempotentHint=True),
                 ),
                 Tool(
                     name="desktop_create_window_group",
@@ -269,6 +277,7 @@ class LinuxDesktopMCPServer:
                             },
                         },
                     },
+                    annotations=ToolAnnotations(idempotentHint=True),
                 ),
                 Tool(
                     name="desktop_release_window",
@@ -288,6 +297,7 @@ class LinuxDesktopMCPServer:
                             },
                         },
                     },
+                    annotations=ToolAnnotations(idempotentHint=True),
                 ),
             ]
 
