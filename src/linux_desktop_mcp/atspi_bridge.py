@@ -5,10 +5,10 @@ to provide async access from the MCP server.
 """
 
 import asyncio
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Callable, Any
-import logging
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,8 @@ ROLE_MAPPING: dict[int, str] = {}
 
 try:
     import gi
-    gi.require_version('Atspi', '2.0')
+
+    gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi
 
     ROLE_MAPPING = {
@@ -77,8 +78,12 @@ except (ImportError, ValueError) as e:
     Atspi = None
 
 
-from .references import (
-    ElementReference, ElementRole, ElementBounds, ElementState, ReferenceManager
+from .references import (  # noqa: E402
+    ElementBounds,
+    ElementReference,
+    ElementRole,
+    ElementState,
+    ReferenceManager,
 )
 
 
@@ -97,10 +102,10 @@ def _get_state_from_atspi(state_set) -> ElementState:
         return ElementState()
 
     return ElementState(
-        visible=state_set.contains(Atspi.StateType.VISIBLE) and
-                state_set.contains(Atspi.StateType.SHOWING),
-        enabled=state_set.contains(Atspi.StateType.ENABLED) and
-                state_set.contains(Atspi.StateType.SENSITIVE),
+        visible=state_set.contains(Atspi.StateType.VISIBLE)
+        and state_set.contains(Atspi.StateType.SHOWING),
+        enabled=state_set.contains(Atspi.StateType.ENABLED)
+        and state_set.contains(Atspi.StateType.SENSITIVE),
         focused=state_set.contains(Atspi.StateType.FOCUSED),
         selected=state_set.contains(Atspi.StateType.SELECTED),
         checked=state_set.contains(Atspi.StateType.CHECKED),
@@ -123,12 +128,7 @@ def _get_bounds_from_atspi(accessible) -> ElementBounds:
         component = accessible.get_component_iface()
         if component:
             rect = component.get_extents(Atspi.CoordType.SCREEN)
-            return ElementBounds(
-                x=rect.x,
-                y=rect.y,
-                width=rect.width,
-                height=rect.height
-            )
+            return ElementBounds(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
     except Exception:
         pass
     return ElementBounds(x=0, y=0, width=0, height=0)
@@ -229,7 +229,7 @@ class ATSPIBridge:
         current_depth: int = 0,
         app_name: Optional[str] = None,
         window_title: Optional[str] = None,
-        parent_ref: Optional[str] = None
+        parent_ref: Optional[str] = None,
     ) -> list[ElementReference]:
         """Build element tree from accessible (sync)."""
         refs = []
@@ -261,7 +261,7 @@ class ATSPIBridge:
                 available_actions=_get_available_actions(accessible),
                 description=accessible.get_description() or "",
                 value=_get_element_value(accessible),
-                atspi_path=str(accessible.get_id()) if hasattr(accessible, 'get_id') else None,
+                atspi_path=str(accessible.get_id()) if hasattr(accessible, "get_id") else None,
                 atspi_accessible=accessible,
                 parent_ref=parent_ref,
                 app_name=app_name,
@@ -283,7 +283,7 @@ class ATSPIBridge:
                             current_depth=current_depth + 1,
                             app_name=app_name,
                             window_title=window_title,
-                            parent_ref=ref_id
+                            parent_ref=ref_id,
                         )
                         for child_ref in child_refs:
                             if child_ref.parent_ref == ref_id:
@@ -298,9 +298,7 @@ class ATSPIBridge:
         return refs
 
     async def build_tree(
-        self,
-        app_name_filter: Optional[str] = None,
-        max_depth: int = 15
+        self, app_name_filter: Optional[str] = None, max_depth: int = 15
     ) -> list[ElementReference]:
         """Build the full accessibility tree.
 
@@ -333,9 +331,7 @@ class ATSPIBridge:
         return await self._run_sync(_build)
 
     async def build_tree_for_window(
-        self,
-        window_accessible,
-        max_depth: int = 15
+        self, window_accessible, max_depth: int = 15
     ) -> list[ElementReference]:
         """Build accessibility tree for a specific window only.
 
@@ -368,7 +364,7 @@ class ATSPIBridge:
                     window_accessible,
                     max_depth=max_depth,
                     app_name=app_name,
-                    window_title=window_title
+                    window_title=window_title,
                 )
             except Exception as e:
                 logger.error(f"Error building tree for window: {e}")
@@ -377,9 +373,7 @@ class ATSPIBridge:
         return await self._run_sync(_build)
 
     async def build_tree_for_windows(
-        self,
-        window_accessibles: list,
-        max_depth: int = 15
+        self, window_accessibles: list, max_depth: int = 15
     ) -> list[ElementReference]:
         """Build accessibility tree for multiple windows.
 
@@ -411,7 +405,7 @@ class ATSPIBridge:
                         window_accessible,
                         max_depth=max_depth,
                         app_name=app_name,
-                        window_title=window_title
+                        window_title=window_title,
                     )
                     all_refs.extend(refs)
                 except Exception as e:
@@ -517,9 +511,7 @@ class ATSPIBridge:
                 if app:
                     component = app.get_component_iface()
                     if component:
-                        accessible = component.get_accessible_at_point(
-                            x, y, Atspi.CoordType.SCREEN
-                        )
+                        accessible = component.get_accessible_at_point(x, y, Atspi.CoordType.SCREEN)
                         if accessible:
                             return accessible
             except Exception:

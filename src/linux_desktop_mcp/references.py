@@ -4,15 +4,16 @@ Provides a reference management system similar to Chrome extension's ref_id syst
 allowing semantic element targeting by reference instead of coordinates.
 """
 
-import time
 import threading
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
 
 class ElementRole(Enum):
     """Standard element roles from AT-SPI."""
+
     APPLICATION = "application"
     FRAME = "frame"
     WINDOW = "window"
@@ -71,6 +72,7 @@ class ElementRole(Enum):
 @dataclass
 class ElementBounds:
     """Screen position and size of an element."""
+
     x: int
     y: int
     width: int
@@ -85,22 +87,22 @@ class ElementBounds:
     def is_valid(self) -> bool:
         """Check if bounds are valid (non-negative position and non-zero size)."""
         return (
-            self.x >= 0 and self.y >= 0 and
-            self.width > 0 and self.height > 0 and
-            self.width < 65536 and self.height < 65536
+            self.x >= 0
+            and self.y >= 0
+            and self.width > 0
+            and self.height > 0
+            and self.width < 65536
+            and self.height < 65536
         )
 
     def contains_point(self, x: int, y: int) -> bool:
         """Check if a point is within the bounds."""
-        return (self.x <= x < self.x + self.width and
-                self.y <= y < self.y + self.height)
+        return self.x <= x < self.x + self.width and self.y <= y < self.y + self.height
 
     def overlaps(self, other: "ElementBounds", threshold: float = 0.7) -> bool:
         """Check if this bounds overlaps with another by at least threshold."""
-        x_overlap = max(0, min(self.x + self.width, other.x + other.width) -
-                       max(self.x, other.x))
-        y_overlap = max(0, min(self.y + self.height, other.y + other.height) -
-                       max(self.y, other.y))
+        x_overlap = max(0, min(self.x + self.width, other.x + other.width) - max(self.x, other.x))
+        y_overlap = max(0, min(self.y + self.height, other.y + other.height) - max(self.y, other.y))
         overlap_area = x_overlap * y_overlap
         self_area = self.width * self.height
         if self_area == 0:
@@ -111,6 +113,7 @@ class ElementBounds:
 @dataclass
 class ElementState:
     """State flags for an element."""
+
     visible: bool = True
     enabled: bool = True
     focused: bool = False
@@ -166,6 +169,7 @@ class ElementState:
 @dataclass
 class ElementReference:
     """Reference to a UI element."""
+
     ref_id: str
     source: str  # "atspi" or "ocr"
     role: ElementRole

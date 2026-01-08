@@ -1,7 +1,5 @@
 """Tests for input backend module."""
 
-import pytest
-
 from linux_desktop_mcp.input_backends import MAX_TEXT_LENGTH
 
 

@@ -5,11 +5,9 @@ Priority: AT-SPI input > ydotool > xdotool
 """
 
 import asyncio
-import subprocess
-import shutil
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional
-import logging
 
 from .detection import DisplayServer, PlatformCapabilities, detect_capabilities
 from .references import ElementReference
@@ -36,7 +34,7 @@ class InputBackend(ABC):
         y: int,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         """Perform a mouse click at coordinates.
 
@@ -105,9 +103,7 @@ class YdotoolBackend(InputBackend):
         """Run ydotool command."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "ydotool", *args,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE
+                "ydotool", *args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
@@ -124,7 +120,7 @@ class YdotoolBackend(InputBackend):
         y: int,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         await self.move(x, y)
         await asyncio.sleep(0.05)
@@ -168,9 +164,7 @@ class XdotoolBackend(InputBackend):
         """Run xdotool command."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "xdotool", *args,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE
+                "xdotool", *args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
@@ -187,7 +181,7 @@ class XdotoolBackend(InputBackend):
         y: int,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         button_num = self.BUTTON_MAP.get(button, "1")
 
@@ -232,9 +226,7 @@ class WtypeBackend(InputBackend):
         """Run wtype command."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "wtype", *args,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE
+                "wtype", *args, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
@@ -251,7 +243,7 @@ class WtypeBackend(InputBackend):
         y: int,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         logger.warning("wtype does not support mouse clicks")
         return False
@@ -301,7 +293,9 @@ class InputManager:
                 self._keyboard_backend = self._backend
             elif caps.has_wtype:
                 self._keyboard_backend = WtypeBackend()
-                logger.warning("Only keyboard input available (wtype). Mouse input requires ydotool.")
+                logger.warning(
+                    "Only keyboard input available (wtype). Mouse input requires ydotool."
+                )
         else:
             if caps.has_xdotool:
                 self._backend = XdotoolBackend()
@@ -339,7 +333,7 @@ class InputManager:
         y: int,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         """Perform a mouse click."""
         if not self._backend:
@@ -353,7 +347,7 @@ class InputManager:
         ref: ElementReference,
         button: str = "left",
         click_type: str = "single",
-        modifiers: Optional[list[str]] = None
+        modifiers: Optional[list[str]] = None,
     ) -> bool:
         """Click an element by reference."""
         if not ref.bounds.is_valid:
@@ -391,12 +385,7 @@ class InputManager:
 
         return await self._backend.move(x, y)
 
-    async def clear_and_type(
-        self,
-        ref: ElementReference,
-        text: str,
-        delay_ms: int = 12
-    ) -> bool:
+    async def clear_and_type(self, ref: ElementReference, text: str, delay_ms: int = 12) -> bool:
         """Click element, clear it, and type new text."""
         if not await self.click_element(ref):
             return False
@@ -415,12 +404,7 @@ class InputManager:
 
         return await self.type_text(text, delay_ms)
 
-    async def type_and_submit(
-        self,
-        ref: ElementReference,
-        text: str,
-        delay_ms: int = 12
-    ) -> bool:
+    async def type_and_submit(self, ref: ElementReference, text: str, delay_ms: int = 12) -> bool:
         """Click element, type text, and press Enter."""
         if not await self.click_element(ref):
             return False

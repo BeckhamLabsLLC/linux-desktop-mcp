@@ -4,15 +4,15 @@ Provides visual indicators (colored borders) around targeted windows,
 similar to Chrome extension's tab group coloring.
 """
 
-import threading
-import logging
 import atexit
+import logging
+import threading
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
-from .window_manager import WindowGeometry, GroupColor
 from .detection import DisplayServer
+from .window_manager import GroupColor, WindowGeometry
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +26,13 @@ GLib = None
 
 try:
     import gi
-    gi.require_version('Gtk', '3.0')
-    gi.require_version('Gdk', '3.0')
-    from gi.repository import Gtk as _Gtk, Gdk as _Gdk, GLib as _GLib
+
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk as _Gdk
+    from gi.repository import GLib as _GLib
+    from gi.repository import Gtk as _Gtk
+
     Gtk = _Gtk
     Gdk = _Gdk
     GLib = _GLib
@@ -38,8 +42,10 @@ except (ImportError, ValueError) as e:
 
 try:
     import gi
-    gi.require_version('Gtk4LayerShell', '1.0')
+
+    gi.require_version("Gtk4LayerShell", "1.0")
     from gi.repository import Gtk4LayerShell
+
     LAYER_SHELL_AVAILABLE = True
 except (ImportError, ValueError) as e:
     logger.debug(f"gtk4-layer-shell not available: {e}")
@@ -93,9 +99,7 @@ class GtkThread:
             self._started.clear()
 
             self._thread = threading.Thread(
-                target=self._run_gtk_main,
-                name="GtkMainLoop",
-                daemon=True
+                target=self._run_gtk_main, name="GtkMainLoop", daemon=True
             )
             self._thread.start()
 
@@ -129,6 +133,7 @@ class GtkThread:
 
                 # Small sleep to prevent busy-waiting
                 import time
+
                 time.sleep(0.01)
 
         except Exception as e:
@@ -183,6 +188,7 @@ class GtkThread:
 # Global GTK thread instance
 _gtk_thread: Optional[GtkThread] = None
 
+
 def get_gtk_thread() -> Optional[GtkThread]:
     """Get or create the global GTK thread."""
     global _gtk_thread
@@ -200,7 +206,8 @@ BORDER_THICKNESS = 4  # pixels
 @dataclass
 class BorderWindows:
     """Container for the 4 border windows around a target."""
-    top: Any = None      # GTK Window
+
+    top: Any = None  # GTK Window
     bottom: Any = None
     left: Any = None
     right: Any = None
@@ -226,12 +233,7 @@ class OverlayBackend(ABC):
         pass
 
     @abstractmethod
-    def show_border(
-        self,
-        window_id: str,
-        geometry: WindowGeometry,
-        color: GroupColor
-    ) -> bool:
+    def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
         """Show a colored border around a window.
 
         Args:
@@ -262,11 +264,7 @@ class OverlayBackend(ABC):
         pass
 
     @abstractmethod
-    def update_border_position(
-        self,
-        window_id: str,
-        geometry: WindowGeometry
-    ) -> bool:
+    def update_border_position(self, window_id: str, geometry: WindowGeometry) -> bool:
         """Update the position of an existing border.
 
         Args:
@@ -303,12 +301,7 @@ class X11OverlayBackend(OverlayBackend):
         return GTK3_AVAILABLE and self._gtk_thread is not None
 
     def _create_border_window(
-        self,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-        color: GroupColor
+        self, x: int, y: int, width: int, height: int, color: GroupColor
     ) -> Any:
         """Create a single border window. Must be called from GTK thread."""
         window = Gtk.Window(type=Gtk.WindowType.POPUP)
@@ -327,10 +320,10 @@ class X11OverlayBackend(OverlayBackend):
 
         # Connect draw signal
         r, g, b = color.to_rgb()
-        window.connect('draw', lambda w, cr: self._draw_border(cr, r, g, b))
+        window.connect("draw", lambda w, cr: self._draw_border(cr, r, g, b))
 
         # Make click-through after realization
-        window.connect('realize', self._make_click_through)
+        window.connect("realize", self._make_click_through)
 
         # Position and size
         window.move(x, y)
@@ -350,17 +343,13 @@ class X11OverlayBackend(OverlayBackend):
         try:
             # Create an empty region for input - clicks pass through
             import cairo
+
             region = cairo.Region()
             window.input_shape_combine_region(region)
         except Exception as e:
             logger.debug(f"Could not set click-through: {e}")
 
-    def show_border(
-        self,
-        window_id: str,
-        geometry: WindowGeometry,
-        color: GroupColor
-    ) -> bool:
+    def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
         """Show a colored border around a window."""
         if not self._gtk_thread or not self._gtk_thread.is_running:
             if not self._gtk_thread or not self._gtk_thread.start():
@@ -384,18 +373,10 @@ class X11OverlayBackend(OverlayBackend):
                     borders = BorderWindows(window_id=window_id)
 
                     # Create 4 border windows
-                    borders.top = self._create_border_window(
-                        x - t, y - t, w + 2*t, t, color
-                    )
-                    borders.bottom = self._create_border_window(
-                        x - t, y + h, w + 2*t, t, color
-                    )
-                    borders.left = self._create_border_window(
-                        x - t, y, t, h, color
-                    )
-                    borders.right = self._create_border_window(
-                        x + w, y, t, h, color
-                    )
+                    borders.top = self._create_border_window(x - t, y - t, w + 2 * t, t, color)
+                    borders.bottom = self._create_border_window(x - t, y + h, w + 2 * t, t, color)
+                    borders.left = self._create_border_window(x - t, y, t, h, color)
+                    borders.right = self._create_border_window(x + w, y, t, h, color)
 
                     # Show all windows
                     for win in [borders.top, borders.bottom, borders.left, borders.right]:
@@ -455,11 +436,7 @@ class X11OverlayBackend(OverlayBackend):
         else:
             destroy_all()
 
-    def update_border_position(
-        self,
-        window_id: str,
-        geometry: WindowGeometry
-    ) -> bool:
+    def update_border_position(self, window_id: str, geometry: WindowGeometry) -> bool:
         """Update the position of an existing border."""
         with self._lock:
             if window_id not in self._borders:
@@ -473,10 +450,10 @@ class X11OverlayBackend(OverlayBackend):
             try:
                 if borders.top:
                     borders.top.move(x - t, y - t)
-                    borders.top.resize(w + 2*t, t)
+                    borders.top.resize(w + 2 * t, t)
                 if borders.bottom:
                     borders.bottom.move(x - t, y + h)
-                    borders.bottom.resize(w + 2*t, t)
+                    borders.bottom.resize(w + 2 * t, t)
                 if borders.left:
                     borders.left.move(x - t, y)
                     borders.left.resize(t, h)
@@ -519,12 +496,7 @@ class WaylandLayerShellBackend(OverlayBackend):
         except Exception:
             return False
 
-    def show_border(
-        self,
-        window_id: str,
-        geometry: WindowGeometry,
-        color: GroupColor
-    ) -> bool:
+    def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
         """Show border using layer shell - placeholder for now."""
         # Layer shell positioning is complex - for now return False
         # and let the manager fall back to no visual indicator
@@ -545,11 +517,7 @@ class WaylandLayerShellBackend(OverlayBackend):
                 borders.destroy_all()
             self._borders.clear()
 
-    def update_border_position(
-        self,
-        window_id: str,
-        geometry: WindowGeometry
-    ) -> bool:
+    def update_border_position(self, window_id: str, geometry: WindowGeometry) -> bool:
         return False
 
 
@@ -565,12 +533,7 @@ class NoOverlayBackend(OverlayBackend):
     def is_available(self) -> bool:
         return False
 
-    def show_border(
-        self,
-        window_id: str,
-        geometry: WindowGeometry,
-        color: GroupColor
-    ) -> bool:
+    def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
         logger.info(f"Border overlay not shown: {self._reason}")
         return False
 
@@ -580,11 +543,7 @@ class NoOverlayBackend(OverlayBackend):
     def hide_all_borders(self) -> None:
         pass
 
-    def update_border_position(
-        self,
-        window_id: str,
-        geometry: WindowGeometry
-    ) -> bool:
+    def update_border_position(self, window_id: str, geometry: WindowGeometry) -> bool:
         return False
 
 
@@ -642,12 +601,7 @@ class OverlayManager:
         """Check if visual overlays are supported."""
         return self._backend.is_available()
 
-    def show_border(
-        self,
-        window_id: str,
-        geometry: WindowGeometry,
-        color: GroupColor
-    ) -> bool:
+    def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
         """Show a border around a window."""
         return self._backend.show_border(window_id, geometry, color)
 
@@ -659,10 +613,6 @@ class OverlayManager:
         """Hide all borders."""
         self._backend.hide_all_borders()
 
-    def update_border_position(
-        self,
-        window_id: str,
-        geometry: WindowGeometry
-    ) -> bool:
+    def update_border_position(self, window_id: str, geometry: WindowGeometry) -> bool:
         """Update a border's position."""
         return self._backend.update_border_position(window_id, geometry)

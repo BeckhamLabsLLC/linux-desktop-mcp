@@ -10,6 +10,7 @@ from typing import Optional
 
 class DisplayServer(Enum):
     """Linux display server types."""
+
     X11 = "x11"
     WAYLAND = "wayland"
     XWAYLAND = "xwayland"
@@ -19,6 +20,7 @@ class DisplayServer(Enum):
 @dataclass
 class PlatformCapabilities:
     """Available platform capabilities for desktop automation."""
+
     display_server: DisplayServer
     has_atspi: bool = False
     has_ydotool: bool = False
@@ -88,8 +90,10 @@ def _check_atspi_available() -> tuple[bool, bool]:
 
     try:
         import gi
-        gi.require_version('Atspi', '2.0')
+
+        gi.require_version("Atspi", "2.0")
         from gi.repository import Atspi
+
         pyatspi_available = True
 
         desktop = Atspi.get_desktop(0)
@@ -106,11 +110,7 @@ def _check_atspi_available() -> tuple[bool, bool]:
 def _check_ydotool_daemon() -> bool:
     """Check if ydotool daemon is running."""
     try:
-        result = subprocess.run(
-            ["pgrep", "-x", "ydotoold"],
-            capture_output=True,
-            timeout=2
-        )
+        result = subprocess.run(["pgrep", "-x", "ydotoold"], capture_output=True, timeout=2)
         return result.returncode == 0
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
@@ -123,27 +123,27 @@ def _detect_compositor() -> Optional[str]:
         Compositor name (sway, hyprland, gnome, kde, etc.) or None.
     """
     # Check common compositor indicators via environment variables
-    if os.environ.get('SWAYSOCK'):
-        return 'sway'
-    if os.environ.get('HYPRLAND_INSTANCE_SIGNATURE'):
-        return 'hyprland'
-    if os.environ.get('GNOME_SETUP_DISPLAY') or os.environ.get('GNOME_SHELL_SESSION_MODE'):
-        return 'gnome'
-    if os.environ.get('KDE_FULL_SESSION') or os.environ.get('KDE_SESSION_VERSION'):
-        return 'kde'
-    if os.environ.get('WESTON_CONFIG_FILE'):
-        return 'weston'
+    if os.environ.get("SWAYSOCK"):
+        return "sway"
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return "hyprland"
+    if os.environ.get("GNOME_SETUP_DISPLAY") or os.environ.get("GNOME_SHELL_SESSION_MODE"):
+        return "gnome"
+    if os.environ.get("KDE_FULL_SESSION") or os.environ.get("KDE_SESSION_VERSION"):
+        return "kde"
+    if os.environ.get("WESTON_CONFIG_FILE"):
+        return "weston"
 
     # Try to detect via XDG_CURRENT_DESKTOP
-    desktop = os.environ.get('XDG_CURRENT_DESKTOP', '').lower()
-    if 'gnome' in desktop:
-        return 'gnome'
-    if 'kde' in desktop or 'plasma' in desktop:
-        return 'kde'
-    if 'sway' in desktop:
-        return 'sway'
-    if 'hyprland' in desktop:
-        return 'hyprland'
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    if "gnome" in desktop:
+        return "gnome"
+    if "kde" in desktop or "plasma" in desktop:
+        return "kde"
+    if "sway" in desktop:
+        return "sway"
+    if "hyprland" in desktop:
+        return "hyprland"
 
     return None
 
@@ -156,10 +156,12 @@ def _check_layer_shell_available() -> bool:
     """
     try:
         import gi
-        gi.require_version('Gtk4LayerShell', '1.0')
-        from gi.repository import Gtk4LayerShell
+
+        gi.require_version("Gtk4LayerShell", "1.0")
+        from gi.repository import Gtk4LayerShell  # noqa: F401
+
         # Note: Gtk4LayerShell.is_supported() requires GTK to be initialized
-        # So we just check if the import works
+        # So we just check if the import works (import is intentionally unused)
         return True
     except (ImportError, ValueError):
         return False
@@ -201,18 +203,12 @@ def detect_capabilities() -> PlatformCapabilities:
 
     if display_server == DisplayServer.WAYLAND:
         if not caps.has_ydotool and not caps.has_wtype:
-            caps.errors.append(
-                "No Wayland input tool available. Install ydotool or wtype."
-            )
+            caps.errors.append("No Wayland input tool available. Install ydotool or wtype.")
         elif caps.has_ydotool and not _check_ydotool_daemon():
-            caps.errors.append(
-                "ydotool daemon not running. Start with: sudo ydotoold"
-            )
+            caps.errors.append("ydotool daemon not running. Start with: sudo ydotoold")
     elif display_server == DisplayServer.X11:
         if not caps.has_xdotool and not caps.has_ydotool:
-            caps.errors.append(
-                "No X11 input tool available. Install: sudo apt install xdotool"
-            )
+            caps.errors.append("No X11 input tool available. Install: sudo apt install xdotool")
 
     return caps
 

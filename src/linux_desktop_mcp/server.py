@@ -6,19 +6,20 @@ desktop applications using AT-SPI2.
 
 import asyncio
 import logging
-from typing import Optional, Any
+from typing import Any, Optional
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
-from .detection import detect_capabilities, PlatformCapabilities
-from .atspi_bridge import ATSPIBridge, ATSPI_AVAILABLE
+from .atspi_bridge import ATSPI_AVAILABLE, ATSPIBridge
+from .detection import PlatformCapabilities, detect_capabilities
 from .input_backends import InputManager
-from .references import ElementReference, ElementRole
-from .window_manager import WindowGroupManager, GroupColor, WindowGeometry
-from .window_discovery import WindowDiscovery, ATSPI_AVAILABLE as WINDOW_DISCOVERY_AVAILABLE
 from .overlay import OverlayManager
+from .references import ElementReference
+from .window_discovery import ATSPI_AVAILABLE as WINDOW_DISCOVERY_AVAILABLE
+from .window_discovery import WindowDiscovery
+from .window_manager import GroupColor, WindowGeometry, WindowGroupManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -75,40 +76,40 @@ class LinuxDesktopMCPServer:
                 Tool(
                     name="desktop_snapshot",
                     description="Capture accessibility tree with semantic element references. "
-                               "Returns a tree of UI elements with ref IDs that can be used for interaction.",
+                    "Returns a tree of UI elements with ref IDs that can be used for interaction.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "app_name": {
                                 "type": "string",
-                                "description": "Filter to specific application name (optional)"
+                                "description": "Filter to specific application name (optional)",
                             },
                             "max_depth": {
                                 "type": "integer",
                                 "description": "Maximum tree traversal depth (default: 15)",
-                                "default": 15
-                            }
-                        }
-                    }
+                                "default": 15,
+                            },
+                        },
+                    },
                 ),
                 Tool(
                     name="desktop_find",
                     description="Find elements by natural language query. "
-                               "Search for buttons, text fields, links, etc. by name or role.",
+                    "Search for buttons, text fields, links, etc. by name or role.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "query": {
                                 "type": "string",
-                                "description": "Natural language query (e.g., 'save button', 'search field')"
+                                "description": "Natural language query (e.g., 'save button', 'search field')",
                             },
                             "app_name": {
                                 "type": "string",
-                                "description": "Filter to specific application (optional)"
-                            }
+                                "description": "Filter to specific application (optional)",
+                            },
                         },
-                        "required": ["query"]
-                    }
+                        "required": ["query"],
+                    },
                 ),
                 Tool(
                     name="desktop_click",
@@ -118,36 +119,36 @@ class LinuxDesktopMCPServer:
                         "properties": {
                             "ref": {
                                 "type": "string",
-                                "description": "Element reference ID (e.g., 'ref_5')"
+                                "description": "Element reference ID (e.g., 'ref_5')",
                             },
                             "element": {
                                 "type": "string",
-                                "description": "Human-readable element description for logging"
+                                "description": "Human-readable element description for logging",
                             },
                             "coordinate": {
                                 "type": "array",
                                 "items": {"type": "integer"},
                                 "minItems": 2,
                                 "maxItems": 2,
-                                "description": "Fallback [x, y] coordinates if no ref"
+                                "description": "Fallback [x, y] coordinates if no ref",
                             },
                             "button": {
                                 "type": "string",
                                 "enum": ["left", "right", "middle"],
-                                "default": "left"
+                                "default": "left",
                             },
                             "click_type": {
                                 "type": "string",
                                 "enum": ["single", "double"],
-                                "default": "single"
+                                "default": "single",
                             },
                             "modifiers": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Modifier keys like ['ctrl', 'shift']"
-                            }
-                        }
-                    }
+                                "description": "Modifier keys like ['ctrl', 'shift']",
+                            },
+                        },
+                    },
                 ),
                 Tool(
                     name="desktop_type",
@@ -155,31 +156,28 @@ class LinuxDesktopMCPServer:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "text": {
-                                "type": "string",
-                                "description": "Text to type"
-                            },
+                            "text": {"type": "string", "description": "Text to type"},
                             "ref": {
                                 "type": "string",
-                                "description": "Element reference to type into (optional)"
+                                "description": "Element reference to type into (optional)",
                             },
                             "element": {
                                 "type": "string",
-                                "description": "Human-readable element description"
+                                "description": "Human-readable element description",
                             },
                             "clear_first": {
                                 "type": "boolean",
                                 "description": "Clear existing text before typing (Ctrl+A, Delete)",
-                                "default": False
+                                "default": False,
                             },
                             "submit": {
                                 "type": "boolean",
                                 "description": "Press Enter after typing",
-                                "default": False
-                            }
+                                "default": False,
+                            },
                         },
-                        "required": ["text"]
-                    }
+                        "required": ["text"],
+                    },
                 ),
                 Tool(
                     name="desktop_key",
@@ -189,111 +187,108 @@ class LinuxDesktopMCPServer:
                         "properties": {
                             "key": {
                                 "type": "string",
-                                "description": "Key name (e.g., 'Return', 'Tab', 'Escape', 'a')"
+                                "description": "Key name (e.g., 'Return', 'Tab', 'Escape', 'a')",
                             },
                             "modifiers": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Modifier keys like ['ctrl', 'shift', 'alt', 'super']"
-                            }
+                                "description": "Modifier keys like ['ctrl', 'shift', 'alt', 'super']",
+                            },
                         },
-                        "required": ["key"]
-                    }
+                        "required": ["key"],
+                    },
                 ),
                 Tool(
                     name="desktop_capabilities",
                     description="Get information about available desktop automation capabilities.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {}
-                    }
+                    inputSchema={"type": "object", "properties": {}},
                 ),
                 Tool(
                     name="desktop_context",
                     description="Get information about the current window group context and available windows. "
-                               "Similar to Chrome extension's tabs_context. Call this to understand which windows "
-                               "Claude is currently working with.",
+                    "Similar to Chrome extension's tabs_context. Call this to understand which windows "
+                    "Claude is currently working with.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "list_available": {
                                 "type": "boolean",
                                 "description": "Also list all available windows on desktop (default: false)",
-                                "default": False
+                                "default": False,
                             }
-                        }
-                    }
+                        },
+                    },
                 ),
                 Tool(
                     name="desktop_target_window",
                     description="Target a specific window for automation. Draws a colored border around "
-                               "the window to indicate it's being controlled by Claude. The targeted window "
-                               "will be added to the current window group. Use desktop_context first to see "
-                               "available windows.",
+                    "the window to indicate it's being controlled by Claude. The targeted window "
+                    "will be added to the current window group. Use desktop_context first to see "
+                    "available windows.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "window_title": {
                                 "type": "string",
-                                "description": "Window title to match (partial match supported)"
+                                "description": "Window title to match (partial match supported)",
                             },
                             "app_name": {
                                 "type": "string",
-                                "description": "Application name to filter by"
+                                "description": "Application name to filter by",
                             },
                             "window_id": {
                                 "type": "string",
-                                "description": "Direct window ID from desktop_context (win_N)"
+                                "description": "Direct window ID from desktop_context (win_N)",
                             },
                             "color": {
                                 "type": "string",
                                 "enum": ["blue", "purple", "green", "orange", "red", "cyan"],
                                 "description": "Border color for the window (default: blue)",
-                                "default": "blue"
-                            }
-                        }
-                    }
+                                "default": "blue",
+                            },
+                        },
+                    },
                 ),
                 Tool(
                     name="desktop_create_window_group",
                     description="Create a new window group for organizing targeted windows. "
-                               "Similar to Chrome's tab groups. If a window group already exists, "
-                               "this creates a new one and makes it active.",
+                    "Similar to Chrome's tab groups. If a window group already exists, "
+                    "this creates a new one and makes it active.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "name": {
                                 "type": "string",
-                                "description": "Optional name for the group"
+                                "description": "Optional name for the group",
                             },
                             "color": {
                                 "type": "string",
                                 "enum": ["blue", "purple", "green", "orange", "red", "cyan"],
                                 "description": "Color for the group (default: blue)",
-                                "default": "blue"
-                            }
-                        }
-                    }
+                                "default": "blue",
+                            },
+                        },
+                    },
                 ),
                 Tool(
                     name="desktop_release_window",
                     description="Release a window from the current group. Removes the border overlay "
-                               "and stops tracking the window.",
+                    "and stops tracking the window.",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "window_id": {
                                 "type": "string",
-                                "description": "Window ID to release (win_N from desktop_context)"
+                                "description": "Window ID to release (win_N from desktop_context)",
                             },
                             "release_all": {
                                 "type": "boolean",
                                 "description": "Release all windows in current group",
-                                "default": False
-                            }
-                        }
-                    }
-                )
+                                "default": False,
+                            },
+                        },
+                    },
+                ),
             ]
 
         @self._server.call_tool()
@@ -359,10 +354,12 @@ class LinuxDesktopMCPServer:
     async def _handle_snapshot(self, args: dict[str, Any]) -> list[TextContent]:
         """Handle desktop_snapshot tool."""
         if not await self._ensure_initialized():
-            return [TextContent(
-                type="text",
-                text="Error: AT-SPI2 not available. Install: sudo apt install python3-pyatspi gir1.2-atspi-2.0 at-spi2-core"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text="Error: AT-SPI2 not available. Install: sudo apt install python3-pyatspi gir1.2-atspi-2.0 at-spi2-core",
+                )
+            ]
 
         app_name = args.get("app_name")
         max_depth = args.get("max_depth", 15)
@@ -378,46 +375,44 @@ class LinuxDesktopMCPServer:
             group.validate_windows()
 
             if not group.windows:
-                return [TextContent(
-                    type="text",
-                    text="All targeted windows have been closed. Use desktop_target_window to target new windows."
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text="All targeted windows have been closed. Use desktop_target_window to target new windows.",
+                    )
+                ]
 
             # Get active window or all windows in group
             active_window = group.get_active_window()
             if active_window and active_window.atspi_accessible:
                 refs = await self._bridge.build_tree_for_window(
-                    active_window.atspi_accessible,
-                    max_depth=max_depth
+                    active_window.atspi_accessible, max_depth=max_depth
                 )
-                window_info = f"Window: \"{active_window.window_title}\" ({active_window.app_name})"
+                window_info = f'Window: "{active_window.window_title}" ({active_window.app_name})'
             else:
                 # Build tree for all windows in group
                 window_accessibles = [
-                    t.atspi_accessible for t in group.windows.values()
-                    if t.atspi_accessible
+                    t.atspi_accessible for t in group.windows.values() if t.atspi_accessible
                 ]
                 refs = await self._bridge.build_tree_for_windows(
-                    window_accessibles,
-                    max_depth=max_depth
+                    window_accessibles, max_depth=max_depth
                 )
                 window_info = f"All {len(group.windows)} targeted windows"
         else:
             # No targeting - use full desktop scan (original behavior)
-            refs = await self._bridge.build_tree(
-                app_name_filter=app_name,
-                max_depth=max_depth
-            )
+            refs = await self._bridge.build_tree(app_name_filter=app_name, max_depth=max_depth)
             window_info = None
 
         if not refs:
-            return [TextContent(
-                type="text",
-                text="No elements found. Ensure applications are running and accessibility is enabled."
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text="No elements found. Ensure applications are running and accessibility is enabled.",
+                )
+            ]
 
         if targeted_mode:
-            output_lines = [f"# Accessibility Tree (Targeted)", f"# {window_info}", ""]
+            output_lines = ["# Accessibility Tree (Targeted)", f"# {window_info}", ""]
         else:
             output_lines = ["# Desktop Accessibility Tree", ""]
             if app_name:
@@ -445,10 +440,7 @@ class LinuxDesktopMCPServer:
     async def _handle_find(self, args: dict[str, Any]) -> list[TextContent]:
         """Handle desktop_find tool."""
         if not await self._ensure_initialized():
-            return [TextContent(
-                type="text",
-                text="Error: AT-SPI2 not available"
-            )]
+            return [TextContent(type="text", text="Error: AT-SPI2 not available")]
 
         query = args.get("query", "")
         app_name = args.get("app_name")
@@ -470,21 +462,20 @@ class LinuxDesktopMCPServer:
             group.validate_windows()
 
             if not group.windows:
-                return [TextContent(
-                    type="text",
-                    text="All targeted windows have been closed. Use desktop_target_window to target new windows."
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text="All targeted windows have been closed. Use desktop_target_window to target new windows.",
+                    )
+                ]
 
             # Get active window or all windows in group
             active_window = group.get_active_window()
             if active_window and active_window.atspi_accessible:
-                await self._bridge.build_tree_for_window(
-                    active_window.atspi_accessible
-                )
+                await self._bridge.build_tree_for_window(active_window.atspi_accessible)
             else:
                 window_accessibles = [
-                    t.atspi_accessible for t in group.windows.values()
-                    if t.atspi_accessible
+                    t.atspi_accessible for t in group.windows.values() if t.atspi_accessible
                 ]
                 await self._bridge.build_tree_for_windows(window_accessibles)
         else:
@@ -494,10 +485,9 @@ class LinuxDesktopMCPServer:
 
         if not matches:
             scope_note = " (in targeted windows)" if targeted_mode else ""
-            return [TextContent(
-                type="text",
-                text=f"No elements found matching: {query}{scope_note}"
-            )]
+            return [
+                TextContent(type="text", text=f"No elements found matching: {query}{scope_note}")
+            ]
 
         scope_note = " (in targeted windows)" if targeted_mode else ""
         output_lines = [f"# Found {len(matches)} elements matching '{query}'{scope_note}", ""]
@@ -506,8 +496,7 @@ class LinuxDesktopMCPServer:
             state_str = ", ".join(ref.state.to_list()) if ref.state.to_list() else "normal"
             bounds = f"({ref.bounds.x}, {ref.bounds.y}, {ref.bounds.width}x{ref.bounds.height})"
             output_lines.append(
-                f"- {ref.ref_id}: [{ref.role.value}] \"{ref.name}\" "
-                f"({state_str}) at {bounds}"
+                f'- {ref.ref_id}: [{ref.role.value}] "{ref.name}" ({state_str}) at {bounds}'
             )
             if ref.app_name:
                 output_lines.append(f"  App: {ref.app_name}")
@@ -535,27 +524,31 @@ class LinuxDesktopMCPServer:
         if ref_id:
             ref = self._bridge.ref_manager.get(ref_id)
             if not ref:
-                return [TextContent(
-                    type="text",
-                    text=f"Error: Reference {ref_id} not found or expired. Run desktop_snapshot first."
-                )]
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Error: Reference {ref_id} not found or expired. Run desktop_snapshot first.",
+                    )
+                ]
 
             if ref.atspi_accessible and "click" in ref.available_actions:
                 success = await self._bridge.click_element(ref, button)
                 if success:
-                    return [TextContent(
-                        type="text",
-                        text=f"Clicked {element_desc} ({ref_id}) via AT-SPI action"
-                    )]
+                    return [
+                        TextContent(
+                            type="text", text=f"Clicked {element_desc} ({ref_id}) via AT-SPI action"
+                        )
+                    ]
 
             if self._input and self._input.can_click:
                 success = await self._input.click_element(ref, button, click_type, modifiers)
                 if success:
                     x, y = ref.bounds.center
-                    return [TextContent(
-                        type="text",
-                        text=f"Clicked {element_desc} ({ref_id}) at ({x}, {y})"
-                    )]
+                    return [
+                        TextContent(
+                            type="text", text=f"Clicked {element_desc} ({ref_id}) at ({x}, {y})"
+                        )
+                    ]
 
             return [TextContent(type="text", text=f"Failed to click {element_desc}")]
 
@@ -601,10 +594,9 @@ class LinuxDesktopMCPServer:
         if ref_id:
             ref = self._bridge.ref_manager.get(ref_id)
             if not ref:
-                return [TextContent(
-                    type="text",
-                    text=f"Error: Reference {ref_id} not found or expired"
-                )]
+                return [
+                    TextContent(type="text", text=f"Error: Reference {ref_id} not found or expired")
+                ]
 
             if ref.atspi_accessible and ref.state.editable:
                 success = await self._bridge.set_text(ref, text, clear_first)
@@ -631,7 +623,7 @@ class LinuxDesktopMCPServer:
         if not success:
             return [TextContent(type="text", text="Failed to type text")]
 
-        msg = f"Typed text"
+        msg = "Typed text"
         if ref_id:
             msg = f"Typed text in {element_desc} ({ref_id})"
 
@@ -664,7 +656,7 @@ class LinuxDesktopMCPServer:
             mod_str = "+".join(modifiers) + "+" if modifiers else ""
             return [TextContent(type="text", text=f"Pressed {mod_str}{key}")]
 
-        return [TextContent(type="text", text=f"Failed to press key")]
+        return [TextContent(type="text", text="Failed to press key")]
 
     async def _handle_capabilities(self, args: dict[str, Any]) -> list[TextContent]:
         """Handle desktop_capabilities tool."""
@@ -678,37 +670,41 @@ class LinuxDesktopMCPServer:
         ]
         if caps.compositor_name:
             lines.append(f"Compositor: {caps.compositor_name}")
-        lines.extend([
-            f"AT-SPI2 Available: {caps.has_atspi}",
-            f"AT-SPI2 Registry Running: {caps.atspi_registry_available}",
-            "",
-            "## Input Tools",
-            f"- ydotool: {'Available' if caps.has_ydotool else 'Not found'}",
-            f"- xdotool: {'Available' if caps.has_xdotool else 'Not found'}",
-            f"- wtype: {'Available' if caps.has_wtype else 'Not found'}",
-            "",
-            f"Active Input Backend: {self._input.backend_name if self._input else 'None'}",
-            f"Can Click: {self._input.can_click if self._input else False}",
-            f"Can Type: {self._input.can_type if self._input else False}",
-            "",
-            "## Screenshot Tools",
-            f"- scrot: {'Available' if caps.has_scrot else 'Not found'}",
-            f"- grim: {'Available' if caps.has_grim else 'Not found'}",
-            "",
-            "## OCR Tools",
-            f"- tesseract: {'Available' if caps.has_tesseract else 'Not found'}",
-            "",
-            "## Window Targeting",
-            f"- Window Discovery: {'Available' if self._window_discovery else 'Not available'}",
-        ])
+        lines.extend(
+            [
+                f"AT-SPI2 Available: {caps.has_atspi}",
+                f"AT-SPI2 Registry Running: {caps.atspi_registry_available}",
+                "",
+                "## Input Tools",
+                f"- ydotool: {'Available' if caps.has_ydotool else 'Not found'}",
+                f"- xdotool: {'Available' if caps.has_xdotool else 'Not found'}",
+                f"- wtype: {'Available' if caps.has_wtype else 'Not found'}",
+                "",
+                f"Active Input Backend: {self._input.backend_name if self._input else 'None'}",
+                f"Can Click: {self._input.can_click if self._input else False}",
+                f"Can Type: {self._input.can_type if self._input else False}",
+                "",
+                "## Screenshot Tools",
+                f"- scrot: {'Available' if caps.has_scrot else 'Not found'}",
+                f"- grim: {'Available' if caps.has_grim else 'Not found'}",
+                "",
+                "## OCR Tools",
+                f"- tesseract: {'Available' if caps.has_tesseract else 'Not found'}",
+                "",
+                "## Window Targeting",
+                f"- Window Discovery: {'Available' if self._window_discovery else 'Not available'}",
+            ]
+        )
         if self._overlay_manager:
-            lines.append(f"- Visual Overlays: {'Available' if self._overlay_manager.has_visual_support else 'Not supported'}")
-            if caps.display_server.value == 'wayland' and caps.compositor_name == 'gnome':
+            lines.append(
+                f"- Visual Overlays: {'Available' if self._overlay_manager.has_visual_support else 'Not supported'}"
+            )
+            if caps.display_server.value == "wayland" and caps.compositor_name == "gnome":
                 lines.append("  (GNOME Wayland does not support window overlays)")
         else:
-            lines.append(f"- Visual Overlays: Not initialized")
+            lines.append("- Visual Overlays: Not initialized")
         if caps.has_layer_shell:
-            lines.append(f"- Layer Shell: Available")
+            lines.append("- Layer Shell: Available")
 
         if caps.errors:
             lines.append("")
@@ -750,11 +746,13 @@ class LinuxDesktopMCPServer:
                     if target.geometry:
                         geom_str = f" at ({target.geometry.x}, {target.geometry.y}, {target.geometry.width}x{target.geometry.height})"
                     output_lines.append(
-                        f"- {target.window_id}: \"{target.window_title}\" ({target.app_name}){geom_str}{active_marker}"
+                        f'- {target.window_id}: "{target.window_title}" ({target.app_name}){geom_str}{active_marker}'
                     )
                 output_lines.append("")
         else:
-            output_lines.append("No active window group. Use desktop_target_window to target a window.")
+            output_lines.append(
+                "No active window group. Use desktop_target_window to target a window."
+            )
             output_lines.append("")
 
         # List available windows if requested
@@ -770,7 +768,7 @@ class LinuxDesktopMCPServer:
                             if win.geometry:
                                 geom_str = f" at ({win.geometry.x}, {win.geometry.y}, {win.geometry.width}x{win.geometry.height})"
                             output_lines.append(
-                                f"- \"{win.window_title}\" ({win.app_name}){geom_str}{active_marker}"
+                                f'- "{win.window_title}" ({win.app_name}){geom_str}{active_marker}'
                             )
                     else:
                         output_lines.append("No windows found")
@@ -801,19 +799,25 @@ class LinuxDesktopMCPServer:
             if result:
                 group, target = result
                 group.set_active_window(window_id)
-                return [TextContent(
-                    type="text",
-                    text=f"Switched to window: {target.window_title} ({window_id})"
-                )]
+                return [
+                    TextContent(
+                        type="text", text=f"Switched to window: {target.window_title} ({window_id})"
+                    )
+                ]
             else:
-                return [TextContent(type="text", text=f"Window ID {window_id} not found in targeted windows")]
+                return [
+                    TextContent(
+                        type="text", text=f"Window ID {window_id} not found in targeted windows"
+                    )
+                ]
 
         # Find window by title/app name
         if not window_title and not app_name:
-            return [TextContent(
-                type="text",
-                text="Error: Provide either window_title, app_name, or window_id"
-            )]
+            return [
+                TextContent(
+                    type="text", text="Error: Provide either window_title, app_name, or window_id"
+                )
+            ]
 
         try:
             if window_title:
@@ -827,19 +831,23 @@ class LinuxDesktopMCPServer:
 
             # Use first match
             win = windows[0]
-            geometry = WindowGeometry(
-                x=win.geometry.x,
-                y=win.geometry.y,
-                width=win.geometry.width,
-                height=win.geometry.height
-            ) if win.geometry else None
+            geometry = (
+                WindowGeometry(
+                    x=win.geometry.x,
+                    y=win.geometry.y,
+                    width=win.geometry.width,
+                    height=win.geometry.height,
+                )
+                if win.geometry
+                else None
+            )
 
             group, target = self._window_manager.add_window_to_active_group(
                 app_name=win.app_name,
                 window_title=win.window_title,
                 atspi_accessible=win.atspi_accessible,
                 geometry=geometry,
-                color=color
+                color=color,
             )
 
             # Show border overlay (if overlay manager available)
@@ -853,7 +861,7 @@ class LinuxDesktopMCPServer:
                 "# Window Targeted",
                 "",
                 f"- Window ID: {target.window_id}",
-                f"- Title: \"{target.window_title}\"",
+                f'- Title: "{target.window_title}"',
                 f"- Application: {target.app_name}",
                 f"- Group: {group.group_id}",
                 f"- Color: {color.name.lower()}",
@@ -915,7 +923,9 @@ class LinuxDesktopMCPServer:
             return [TextContent(type="text", text=f"Released {count} windows from all groups")]
 
         if not window_id:
-            return [TextContent(type="text", text="Error: Provide window_id or set release_all=true")]
+            return [
+                TextContent(type="text", text="Error: Provide window_id or set release_all=true")
+            ]
 
         target = self._window_manager.release_window(window_id)
         if target:
@@ -925,10 +935,11 @@ class LinuxDesktopMCPServer:
                     self._overlay_manager.hide_border(window_id)
                 except Exception as e:
                     logger.warning(f"Failed to hide overlay: {e}")
-            return [TextContent(
-                type="text",
-                text=f"Released window: \"{target.window_title}\" ({window_id})"
-            )]
+            return [
+                TextContent(
+                    type="text", text=f'Released window: "{target.window_title}" ({window_id})'
+                )
+            ]
         else:
             return [TextContent(type="text", text=f"Window ID {window_id} not found")]
 
@@ -936,9 +947,7 @@ class LinuxDesktopMCPServer:
         """Run the MCP server."""
         async with stdio_server() as (read_stream, write_stream):
             await self._server.run(
-                read_stream,
-                write_stream,
-                self._server.create_initialization_options()
+                read_stream, write_stream, self._server.create_initialization_options()
             )
 
 

@@ -4,19 +4,20 @@ Provides Chrome-extension-like window targeting, allowing Claude to focus on
 specific windows instead of the entire desktop, reducing context usage.
 """
 
-import uuid
-import time
+import logging
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any
-import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class GroupColor(Enum):
     """Color options for window group borders."""
+
     BLUE = "#4285F4"
     PURPLE = "#A142F4"
     GREEN = "#34A853"
@@ -39,7 +40,7 @@ class GroupColor(Enum):
 
     def to_rgb(self) -> tuple[float, float, float]:
         """Convert hex color to RGB floats (0.0-1.0)."""
-        hex_color = self.value.lstrip('#')
+        hex_color = self.value.lstrip("#")
         r = int(hex_color[0:2], 16) / 255.0
         g = int(hex_color[2:4], 16) / 255.0
         b = int(hex_color[4:6], 16) / 255.0
@@ -49,6 +50,7 @@ class GroupColor(Enum):
 @dataclass
 class WindowGeometry:
     """Window position and size."""
+
     x: int
     y: int
     width: int
@@ -61,17 +63,13 @@ class WindowGeometry:
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
-        return {
-            "x": self.x,
-            "y": self.y,
-            "width": self.width,
-            "height": self.height
-        }
+        return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
 
 
 @dataclass
 class WindowTarget:
     """Represents a single targeted window."""
+
     window_id: str
     app_name: str
     window_title: str
@@ -105,6 +103,7 @@ class WindowTarget:
 @dataclass
 class WindowGroup:
     """A group of targeted windows (analogous to Chrome tab group)."""
+
     group_id: str = field(default_factory=lambda: f"grp_{uuid.uuid4().hex[:8]}")
     name: Optional[str] = None
     color: GroupColor = GroupColor.BLUE
@@ -204,9 +203,7 @@ class WindowGroupManager:
             return f"win_{self._window_counter}"
 
     def create_group(
-        self,
-        name: Optional[str] = None,
-        color: GroupColor = GroupColor.BLUE
+        self, name: Optional[str] = None, color: GroupColor = GroupColor.BLUE
     ) -> WindowGroup:
         """Create a new window group."""
         with self._lock:
@@ -229,10 +226,7 @@ class WindowGroupManager:
                 return self._groups.get(self._active_group_id)
             return None
 
-    def get_or_create_active_group(
-        self,
-        color: GroupColor = GroupColor.BLUE
-    ) -> WindowGroup:
+    def get_or_create_active_group(self, color: GroupColor = GroupColor.BLUE) -> WindowGroup:
         """Get the active group, creating one if none exists."""
         group = self.get_active_group()
         if group is None:
@@ -270,7 +264,7 @@ class WindowGroupManager:
         window_title: str,
         atspi_accessible: Any,
         geometry: Optional[WindowGeometry] = None,
-        color: GroupColor = GroupColor.BLUE
+        color: GroupColor = GroupColor.BLUE,
     ) -> tuple[WindowGroup, WindowTarget]:
         """Add a window to the active group (creates group if needed).
 

@@ -1,12 +1,11 @@
 """Tests for the reference manager module."""
 
 import time
-import pytest
 
 from linux_desktop_mcp.references import (
+    ElementBounds,
     ElementReference,
     ElementRole,
-    ElementBounds,
     ElementState,
     ReferenceManager,
 )

@@ -4,11 +4,11 @@ Provides functions to enumerate and find windows using AT-SPI2 accessibility API
 """
 
 import asyncio
+import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Any, Callable
 from dataclasses import dataclass
-import logging
+from typing import Any, Callable, Optional
 
 from .window_manager import WindowGeometry
 
@@ -20,8 +20,10 @@ Atspi = None
 
 try:
     import gi
-    gi.require_version('Atspi', '2.0')
+
+    gi.require_version("Atspi", "2.0")
     from gi.repository import Atspi
+
     ATSPI_AVAILABLE = True
 except (ImportError, ValueError) as e:
     logger.warning(f"AT-SPI2 not available: {e}")
@@ -30,6 +32,7 @@ except (ImportError, ValueError) as e:
 @dataclass
 class WindowInfo:
     """Information about a discovered window."""
+
     app_name: str
     window_title: str
     atspi_accessible: Any  # Atspi.Accessible
@@ -78,12 +81,7 @@ class WindowDiscovery:
             component = accessible.get_component_iface()
             if component:
                 rect = component.get_extents(Atspi.CoordType.SCREEN)
-                return WindowGeometry(
-                    x=rect.x,
-                    y=rect.y,
-                    width=rect.width,
-                    height=rect.height
-                )
+                return WindowGeometry(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
         except Exception:
             pass
         return None
@@ -146,15 +144,17 @@ class WindowDiscovery:
                         if geometry and not geometry.is_valid:
                             continue
 
-                        windows.append(WindowInfo(
-                            app_name=app_name,
-                            window_title=window_title,
-                            atspi_accessible=window,
-                            geometry=geometry,
-                            is_active=state_set.contains(Atspi.StateType.ACTIVE),
-                            is_focused=state_set.contains(Atspi.StateType.FOCUSED),
-                            pid=pid,
-                        ))
+                        windows.append(
+                            WindowInfo(
+                                app_name=app_name,
+                                window_title=window_title,
+                                atspi_accessible=window,
+                                geometry=geometry,
+                                is_active=state_set.contains(Atspi.StateType.ACTIVE),
+                                is_focused=state_set.contains(Atspi.StateType.FOCUSED),
+                                pid=pid,
+                            )
+                        )
 
                     except Exception as e:
                         logger.debug(f"Error processing window: {e}")
@@ -175,9 +175,7 @@ class WindowDiscovery:
         return await self._run_sync(self._enumerate_windows_sync)
 
     def _find_window_by_title_sync(
-        self,
-        title_pattern: str,
-        app_name: Optional[str] = None
+        self, title_pattern: str, app_name: Optional[str] = None
     ) -> list[WindowInfo]:
         """Find windows matching title pattern (sync)."""
         all_windows = self._enumerate_windows_sync()
@@ -196,9 +194,7 @@ class WindowDiscovery:
         return matches
 
     async def find_window_by_title(
-        self,
-        title_pattern: str,
-        app_name: Optional[str] = None
+        self, title_pattern: str, app_name: Optional[str] = None
     ) -> list[WindowInfo]:
         """Find windows matching a title pattern.
 
@@ -209,21 +205,14 @@ class WindowDiscovery:
         Returns:
             List of matching WindowInfo objects.
         """
-        return await self._run_sync(
-            self._find_window_by_title_sync,
-            title_pattern,
-            app_name
-        )
+        return await self._run_sync(self._find_window_by_title_sync, title_pattern, app_name)
 
     def _find_windows_by_app_sync(self, app_name: str) -> list[WindowInfo]:
         """Find all windows for an application (sync)."""
         all_windows = self._enumerate_windows_sync()
         app_lower = app_name.lower()
 
-        return [
-            w for w in all_windows
-            if app_lower in w.app_name.lower()
-        ]
+        return [w for w in all_windows if app_lower in w.app_name.lower()]
 
     async def find_windows_by_app(self, app_name: str) -> list[WindowInfo]:
         """Find all windows for a specific application.
@@ -278,9 +267,8 @@ class WindowDiscovery:
         """Check if a window is still valid (sync)."""
         try:
             state_set = accessible.get_state_set()
-            return (
-                state_set.contains(Atspi.StateType.VISIBLE) and
-                state_set.contains(Atspi.StateType.SHOWING)
+            return state_set.contains(Atspi.StateType.VISIBLE) and state_set.contains(
+                Atspi.StateType.SHOWING
             )
         except Exception:
             return False

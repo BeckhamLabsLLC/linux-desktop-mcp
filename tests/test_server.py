@@ -1,14 +1,13 @@
 """Tests for the MCP server module."""
 
-import pytest
 import sys
 from unittest.mock import MagicMock
 
 # Mock the mcp module before importing server
-sys.modules['mcp'] = MagicMock()
-sys.modules['mcp.server'] = MagicMock()
-sys.modules['mcp.server.stdio'] = MagicMock()
-sys.modules['mcp.types'] = MagicMock()
+sys.modules["mcp"] = MagicMock()
+sys.modules["mcp.server"] = MagicMock()
+sys.modules["mcp.server.stdio"] = MagicMock()
+sys.modules["mcp.types"] = MagicMock()
 
 
 class TestInputValidationFunctions:
