@@ -156,21 +156,93 @@ Check available automation capabilities.
 
 ## Example Usage
 
+### Example 1: Navigating to a Website in Firefox
+
 ```
-# 1. Take a snapshot to see available elements
-desktop_snapshot(app_name="Firefox")
+User: "Open GitHub in Firefox"
 
-# 2. Find a specific element
-desktop_find(query="search bar")
+Claude uses:
+1. desktop_snapshot(app_name="Firefox")
+   → Returns UI tree with elements like:
+     - ref_5: [entry] "Search or enter address" (editable, focused)
+     - ref_12: [button] "Go" (clickable)
 
-# 3. Click the element
-desktop_click(ref="ref_5", element="URL bar")
+2. desktop_click(ref="ref_5", element="URL bar")
+   → Clicks to focus the address bar
 
-# 4. Type into it
-desktop_type(text="https://github.com", ref="ref_5", submit=True)
+3. desktop_type(text="https://github.com", ref="ref_5", clear_first=True, submit=True)
+   → Types the URL and presses Enter
 
-# 5. Use keyboard shortcuts
-desktop_key(key="t", modifiers=["ctrl"])  # New tab
+Result: Firefox navigates to GitHub
+```
+
+### Example 2: Saving a File in LibreOffice
+
+```
+User: "Save this document as 'report.odt'"
+
+Claude uses:
+1. desktop_key(key="s", modifiers=["ctrl"])
+   → Opens the Save dialog
+
+2. desktop_snapshot(app_name="LibreOffice")
+   → Returns dialog elements including:
+     - ref_8: [entry] "File name:" (editable)
+     - ref_15: [button] "Save" (clickable)
+
+3. desktop_type(text="report.odt", ref="ref_8", clear_first=True)
+   → Types the filename
+
+4. desktop_click(ref="ref_15", element="Save button")
+   → Clicks Save
+
+Result: Document saved as report.odt
+```
+
+### Example 3: Searching in a Code Editor
+
+```
+User: "Search for 'TODO' comments in VS Code"
+
+Claude uses:
+1. desktop_find(query="search", app_name="Code")
+   → Finds search-related elements
+
+2. desktop_key(key="f", modifiers=["ctrl", "shift"])
+   → Opens global search panel
+
+3. desktop_snapshot(app_name="Code")
+   → Returns search panel elements:
+     - ref_22: [entry] "Search" (editable, focused)
+     - ref_25: [checkbox] "Match Case"
+
+4. desktop_type(text="TODO", ref="ref_22", submit=True)
+   → Types search query and executes search
+
+Result: VS Code shows all TODO comments across the project
+```
+
+### Example 4: Window Targeting for Multi-Window Automation
+
+```
+User: "Help me copy data from the spreadsheet to the email"
+
+Claude uses:
+1. desktop_context(list_available=True)
+   → Lists all available windows
+
+2. desktop_target_window(app_name="LibreOffice Calc", color="green")
+   → Targets spreadsheet with green border
+
+3. desktop_target_window(app_name="Thunderbird", color="blue")
+   → Targets email client with blue border
+
+4. desktop_snapshot()
+   → Only shows elements from targeted windows (reduced context)
+
+5. [Proceeds with copy/paste operations between windows]
+
+Result: Claude can efficiently work across multiple applications
 ```
 
 ## Platform Support
@@ -237,6 +309,20 @@ This project was created with Claude Code and we warmly welcome contributions! W
 - Improve documentation
 
 We're very open to help and collaboration. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Privacy Policy
+
+Linux Desktop MCP is a local desktop automation tool that:
+
+- **Runs entirely on your local machine** - No data is transmitted to external servers
+- **Does not collect any personal data** - No analytics, telemetry, or usage tracking
+- **Does not store credentials** - All authentication and authorization is handled by your local system
+- **Accesses only what you explicitly target** - The accessibility tree is read only for windows/applications you interact with
+- **No network connectivity required** - The MCP server operates completely offline
+
+The only data accessed is the accessibility tree information exposed by your desktop applications (UI element names, roles, and states), which is used solely for local automation and is not persisted or transmitted anywhere.
+
+**Contact:** For privacy-related questions, open an issue on [GitHub](https://github.com/BeckhamLabsLLC/linux-desktop-mcp/issues).
 
 ## License
 
