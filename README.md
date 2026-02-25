@@ -41,7 +41,7 @@ sudo ydotoold &
 pip install linux-desktop-mcp
 
 # Or from source
-git clone https://github.com/yourusername/linux-desktop-mcp.git
+git clone https://github.com/BeckhamLabsLLC/linux-desktop-mcp.git
 cd linux-desktop-mcp
 pip install -e .
 ```
@@ -312,17 +312,7 @@ We're very open to help and collaboration. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 ## Privacy Policy
 
-Linux Desktop MCP is a local desktop automation tool that:
-
-- **Runs entirely on your local machine** - No data is transmitted to external servers
-- **Does not collect any personal data** - No analytics, telemetry, or usage tracking
-- **Does not store credentials** - All authentication and authorization is handled by your local system
-- **Accesses only what you explicitly target** - The accessibility tree is read only for windows/applications you interact with
-- **No network connectivity required** - The MCP server operates completely offline
-
-The only data accessed is the accessibility tree information exposed by your desktop applications (UI element names, roles, and states), which is used solely for local automation and is not persisted or transmitted anywhere.
-
-**Contact:** For privacy-related questions, open an issue on [GitHub](https://github.com/BeckhamLabsLLC/linux-desktop-mcp/issues).
+See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for our full privacy policy. In short: Linux Desktop MCP runs entirely on your local machine, collects no data, and requires no network connectivity.
 
 ## License
 

@@ -101,7 +101,8 @@ def _check_atspi_available() -> tuple[bool, bool]:
             registry_running = True
     except (ImportError, ValueError):
         pass
-    except Exception:
+    except OSError:
+        # D-Bus or GLib error when talking to the registry
         pyatspi_available = True
 
     return pyatspi_available, registry_running

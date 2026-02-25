@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
+from .exceptions import ATSPINotAvailableError
 from .window_manager import WindowGeometry
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,14 @@ logger = logging.getLogger(__name__)
 # AT-SPI2 availability check
 ATSPI_AVAILABLE = False
 Atspi = None
+
+# Conditional GLib.Error import for narrow exception catching
+try:
+    from gi.repository import GLib as _GLib
+
+    _GLibError: type[Exception] = _GLib.Error
+except ImportError:
+    _GLibError = Exception
 
 try:
     import gi
@@ -41,7 +50,7 @@ class WindowInfo:
     is_focused: bool
     pid: Optional[int] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for MCP response."""
         return {
             "app_name": self.app_name,
@@ -59,36 +68,36 @@ class WindowDiscovery:
     Provides async methods to enumerate and find windows across the desktop.
     """
 
-    def __init__(self, max_workers: int = 2):
+    def __init__(self, max_workers: int = 2) -> None:
         if not ATSPI_AVAILABLE:
-            raise RuntimeError("AT-SPI2 is not available")
+            raise ATSPINotAvailableError("AT-SPI2 is not available")
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._lock = threading.Lock()
 
-    async def _run_sync(self, func: Callable, *args) -> Any:
+    async def _run_sync(self, func: Callable[..., Any], *args: Any) -> Any:
         """Run a synchronous function in the thread pool."""
         loop = asyncio.get_event_loop()
 
-        def _wrapped():
+        def _wrapped() -> Any:
             with self._lock:
                 return func(*args)
 
         return await loop.run_in_executor(self._executor, _wrapped)
 
-    def _get_window_geometry_sync(self, accessible) -> Optional[WindowGeometry]:
+    def _get_window_geometry_sync(self, accessible: Any) -> Optional[WindowGeometry]:
         """Get window geometry from accessible (sync)."""
         try:
             component = accessible.get_component_iface()
             if component:
                 rect = component.get_extents(Atspi.CoordType.SCREEN)
                 return WindowGeometry(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
-        except Exception:
+        except _GLibError:
             pass
         return None
 
     def _enumerate_windows_sync(self) -> list[WindowInfo]:
         """Enumerate all visible windows (sync)."""
-        windows = []
+        windows: list[WindowInfo] = []
         desktop = Atspi.get_desktop(0)
 
         if not desktop:
@@ -108,10 +117,10 @@ class WindowDiscovery:
                     continue
 
                 # Get process ID if available
-                pid = None
+                pid: Optional[int] = None
                 try:
                     pid = app.get_process_id()
-                except Exception:
+                except _GLibError:
                     pass
 
                 # Iterate through app's children (windows/frames)
@@ -156,11 +165,11 @@ class WindowDiscovery:
                             )
                         )
 
-                    except Exception as e:
+                    except _GLibError as e:
                         logger.debug(f"Error processing window: {e}")
                         continue
 
-            except Exception as e:
+            except _GLibError as e:
                 logger.debug(f"Error processing app: {e}")
                 continue
 
@@ -179,7 +188,7 @@ class WindowDiscovery:
     ) -> list[WindowInfo]:
         """Find windows matching title pattern (sync)."""
         all_windows = self._enumerate_windows_sync()
-        matches = []
+        matches: list[WindowInfo] = []
         title_lower = title_pattern.lower()
 
         for window in all_windows:
@@ -248,11 +257,11 @@ class WindowDiscovery:
         """
         return await self._run_sync(self._get_focused_window_sync)
 
-    def _refresh_window_geometry_sync(self, accessible) -> Optional[WindowGeometry]:
+    def _refresh_window_geometry_sync(self, accessible: Any) -> Optional[WindowGeometry]:
         """Refresh geometry for an accessible window (sync)."""
         return self._get_window_geometry_sync(accessible)
 
-    async def refresh_window_geometry(self, accessible) -> Optional[WindowGeometry]:
+    async def refresh_window_geometry(self, accessible: Any) -> Optional[WindowGeometry]:
         """Refresh the geometry for a window accessible.
 
         Args:
@@ -263,17 +272,17 @@ class WindowDiscovery:
         """
         return await self._run_sync(self._refresh_window_geometry_sync, accessible)
 
-    def _is_window_valid_sync(self, accessible) -> bool:
+    def _is_window_valid_sync(self, accessible: Any) -> bool:
         """Check if a window is still valid (sync)."""
         try:
             state_set = accessible.get_state_set()
             return state_set.contains(Atspi.StateType.VISIBLE) and state_set.contains(
                 Atspi.StateType.SHOWING
             )
-        except Exception:
+        except _GLibError:
             return False
 
-    async def is_window_valid(self, accessible) -> bool:
+    async def is_window_valid(self, accessible: Any) -> bool:
         """Check if a window accessible is still valid.
 
         Args:
@@ -284,6 +293,6 @@ class WindowDiscovery:
         """
         return await self._run_sync(self._is_window_valid_sync, accessible)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shutdown the discovery executor."""
         self._executor.shutdown(wait=True)

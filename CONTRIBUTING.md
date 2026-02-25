@@ -20,7 +20,7 @@ We're very open to contributions of all kinds:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/linux-desktop-mcp.git
+   git clone https://github.com/BeckhamLabsLLC/linux-desktop-mcp.git
    cd linux-desktop-mcp
    ```
 

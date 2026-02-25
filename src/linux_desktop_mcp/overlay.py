@@ -9,9 +9,10 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from .detection import DisplayServer
+from .exceptions import GtkInitError, OverlayError
 from .window_manager import GroupColor, WindowGeometry
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,7 @@ Gtk = None
 Gdk = None
 GLib = None
 
+# Conditional GLib.Error import for narrow exception catching
 try:
     import gi
 
@@ -50,6 +52,12 @@ try:
 except (ImportError, ValueError) as e:
     logger.debug(f"gtk4-layer-shell not available: {e}")
 
+# Narrow GLib.Error catch type
+if GLib is not None:
+    _GLibError: type[Exception] = GLib.Error
+else:
+    _GLibError = Exception
+
 
 class GtkThread:
     """Background thread for running the GTK main loop.
@@ -61,7 +69,7 @@ class GtkThread:
     _instance: Optional["GtkThread"] = None
     _lock = threading.Lock()
 
-    def __new__(cls):
+    def __new__(cls) -> "GtkThread":
         """Singleton pattern - only one GTK thread per process."""
         with cls._lock:
             if cls._instance is None:
@@ -69,7 +77,7 @@ class GtkThread:
                 cls._instance._initialized = False
             return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if self._initialized:
             return
 
@@ -111,15 +119,12 @@ class GtkThread:
             logger.info("GTK background thread started")
             return True
 
-    def _run_gtk_main(self):
+    def _run_gtk_main(self) -> None:
         """Run the GTK main loop (called in background thread)."""
         try:
             # Initialize GTK
             if not Gtk.init_check()[0]:
-                logger.error("GTK init failed")
-                self._running = False
-                self._started.set()
-                return
+                raise GtkInitError("GTK init_check() returned False")
 
             # Signal that we're ready
             self._started.set()
@@ -136,13 +141,17 @@ class GtkThread:
 
                 time.sleep(0.01)
 
-        except Exception as e:
+        except GtkInitError:
+            logger.error("GTK init failed")
+            self._running = False
+            self._started.set()
+        except _GLibError as e:
             logger.error(f"GTK main loop error: {e}")
         finally:
             self._running = False
             logger.debug("GTK main loop exited")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the GTK main loop."""
         with self._lock:
             if not self._running:
@@ -160,7 +169,7 @@ class GtkThread:
         """Check if the GTK thread is running."""
         return self._running
 
-    def schedule(self, func, *args) -> bool:
+    def schedule(self, func: Any, *args: Any) -> bool:
         """Schedule a function to run on the GTK thread.
 
         Args:
@@ -174,10 +183,10 @@ class GtkThread:
             if not self.start():
                 return False
 
-        def wrapper():
+        def wrapper() -> bool:
             try:
                 func(*args)
-            except Exception as e:
+            except _GLibError as e:
                 logger.error(f"Error in GTK scheduled function: {e}")
             return False  # Don't repeat
 
@@ -213,13 +222,13 @@ class BorderWindows:
     right: Any = None
     window_id: str = ""
 
-    def destroy_all(self):
+    def destroy_all(self) -> None:
         """Destroy all border windows."""
         for window in [self.top, self.bottom, self.left, self.right]:
             if window:
                 try:
                     window.destroy()
-                except Exception:
+                except _GLibError:
                     pass
         self.top = self.bottom = self.left = self.right = None
 
@@ -285,11 +294,11 @@ class X11OverlayBackend(OverlayBackend):
     thread to handle window rendering.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not GTK3_AVAILABLE:
-            raise RuntimeError("GTK3 not available")
+            raise OverlayError("GTK3 not available")
 
-        self._borders: Dict[str, BorderWindows] = {}
+        self._borders: dict[str, BorderWindows] = {}
         self._lock = threading.Lock()
         self._gtk_thread = get_gtk_thread()
 
@@ -332,13 +341,13 @@ class X11OverlayBackend(OverlayBackend):
 
         return window
 
-    def _draw_border(self, cr, r: float, g: float, b: float) -> bool:
+    def _draw_border(self, cr: Any, r: float, g: float, b: float) -> bool:
         """Draw the border color."""
         cr.set_source_rgba(r, g, b, 1.0)
         cr.paint()
         return False
 
-    def _make_click_through(self, window):
+    def _make_click_through(self, window: Any) -> None:
         """Make the window click-through using input shape."""
         try:
             # Create an empty region for input - clicks pass through
@@ -346,7 +355,7 @@ class X11OverlayBackend(OverlayBackend):
 
             region = cairo.Region()
             window.input_shape_combine_region(region)
-        except Exception as e:
+        except (ImportError, _GLibError) as e:
             logger.debug(f"Could not set click-through: {e}")
 
     def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
@@ -361,9 +370,9 @@ class X11OverlayBackend(OverlayBackend):
         t = BORDER_THICKNESS
 
         # Create a result holder for thread synchronization
-        result = {"success": False, "done": threading.Event()}
+        result: dict[str, Any] = {"success": False, "done": threading.Event()}
 
-        def create_borders():
+        def create_borders() -> None:
             try:
                 with self._lock:
                     # Hide existing border for this window if any
@@ -387,7 +396,7 @@ class X11OverlayBackend(OverlayBackend):
                     result["success"] = True
                     logger.info(f"Border overlay shown for {window_id}")
 
-            except Exception as e:
+            except _GLibError as e:
                 logger.error(f"Failed to create border overlay: {e}")
                 result["success"] = False
             finally:
@@ -408,7 +417,7 @@ class X11OverlayBackend(OverlayBackend):
 
             borders = self._borders.pop(window_id)
 
-        def destroy():
+        def destroy() -> None:
             borders.destroy_all()
             logger.debug(f"Border overlay hidden for {window_id}")
 
@@ -426,7 +435,7 @@ class X11OverlayBackend(OverlayBackend):
             borders_to_destroy = list(self._borders.values())
             self._borders.clear()
 
-        def destroy_all():
+        def destroy_all() -> None:
             for borders in borders_to_destroy:
                 borders.destroy_all()
             logger.debug("All border overlays hidden")
@@ -446,7 +455,7 @@ class X11OverlayBackend(OverlayBackend):
         x, y, w, h = geometry.x, geometry.y, geometry.width, geometry.height
         t = BORDER_THICKNESS
 
-        def update():
+        def update() -> None:
             try:
                 if borders.top:
                     borders.top.move(x - t, y - t)
@@ -460,7 +469,7 @@ class X11OverlayBackend(OverlayBackend):
                 if borders.right:
                     borders.right.move(x + w, y)
                     borders.right.resize(t, h)
-            except Exception as e:
+            except _GLibError as e:
                 logger.debug(f"Error updating border position: {e}")
 
         if self._gtk_thread and self._gtk_thread.is_running:
@@ -468,7 +477,7 @@ class X11OverlayBackend(OverlayBackend):
             return True
         return False
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shutdown the backend and cleanup resources."""
         self.hide_all_borders()
         # Note: Don't stop the GTK thread here as it's shared
@@ -481,10 +490,10 @@ class WaylandLayerShellBackend(OverlayBackend):
     Does NOT work on GNOME Wayland.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not LAYER_SHELL_AVAILABLE:
-            raise RuntimeError("gtk4-layer-shell not available")
-        self._borders: Dict[str, BorderWindows] = {}
+            raise OverlayError("gtk4-layer-shell not available")
+        self._borders: dict[str, BorderWindows] = {}
         self._lock = threading.Lock()
 
     def is_available(self) -> bool:
@@ -493,7 +502,7 @@ class WaylandLayerShellBackend(OverlayBackend):
         try:
             # Check if layer shell is actually supported by compositor
             return Gtk4LayerShell.is_supported()
-        except Exception:
+        except _GLibError:
             return False
 
     def show_border(self, window_id: str, geometry: WindowGeometry, color: GroupColor) -> bool:
@@ -527,7 +536,7 @@ class NoOverlayBackend(OverlayBackend):
     Used for GNOME Wayland or when GTK is unavailable.
     """
 
-    def __init__(self, reason: str = "No overlay support available"):
+    def __init__(self, reason: str = "No overlay support available") -> None:
         self._reason = reason
 
     def is_available(self) -> bool:
@@ -554,7 +563,7 @@ class OverlayManager:
     available libraries.
     """
 
-    def __init__(self, display_server: DisplayServer):
+    def __init__(self, display_server: DisplayServer) -> None:
         self._display_server = display_server
         self._backend = self._select_backend()
         logger.info(f"Overlay backend: {type(self._backend).__name__}")
@@ -566,7 +575,7 @@ class OverlayManager:
                 try:
                     backend = X11OverlayBackend()
                     return backend
-                except Exception as e:
+                except OverlayError as e:
                     logger.warning(f"Failed to init X11 overlay: {e}")
 
         elif self._display_server in (DisplayServer.WAYLAND, DisplayServer.XWAYLAND):
@@ -576,14 +585,14 @@ class OverlayManager:
                     backend = WaylandLayerShellBackend()
                     if backend.is_available():
                         return backend
-                except Exception as e:
+                except OverlayError as e:
                     logger.debug(f"Layer shell not available: {e}")
 
             # XWayland can use X11 backend
             if self._display_server == DisplayServer.XWAYLAND and GTK3_AVAILABLE:
                 try:
                     return X11OverlayBackend()
-                except Exception as e:
+                except OverlayError as e:
                     logger.debug(f"X11 overlay on XWayland failed: {e}")
 
             # GNOME Wayland or unsupported compositor

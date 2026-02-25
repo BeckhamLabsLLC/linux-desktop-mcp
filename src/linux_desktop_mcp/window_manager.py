@@ -10,7 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class WindowGeometry:
         """Check if geometry is valid (non-zero size)."""
         return self.width > 0 and self.height > 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, int]:
         """Convert to dictionary."""
         return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
 
@@ -78,7 +78,7 @@ class WindowTarget:
     is_active: bool = False
     targeted_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for MCP response."""
         return {
             "window_id": self.window_id,
@@ -107,7 +107,7 @@ class WindowGroup:
     group_id: str = field(default_factory=lambda: f"grp_{uuid.uuid4().hex[:8]}")
     name: Optional[str] = None
     color: GroupColor = GroupColor.BLUE
-    windows: Dict[str, WindowTarget] = field(default_factory=dict)
+    windows: dict[str, WindowTarget] = field(default_factory=dict)
     active_window_id: Optional[str] = None
     created_at: float = field(default_factory=time.time)
 
@@ -168,7 +168,7 @@ class WindowGroup:
                 logger.info(f"Window '{target.window_title}' was closed, removed from group")
         return removed
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for MCP response."""
         return {
             "group_id": self.group_id,
@@ -191,7 +191,7 @@ class WindowGroupManager:
     """
 
     def __init__(self):
-        self._groups: Dict[str, WindowGroup] = {}
+        self._groups: dict[str, WindowGroup] = {}
         self._active_group_id: Optional[str] = None
         self._lock = threading.Lock()
         self._window_counter = 0
@@ -245,7 +245,7 @@ class WindowGroupManager:
         """Delete a group and return it."""
         with self._lock:
             group = self._groups.pop(group_id, None)
-            if group and self._active_group_id == group_id:
+            if group is not None and self._active_group_id == group_id:
                 # Switch to another group if available
                 if self._groups:
                     self._active_group_id = next(iter(self._groups.keys()))
@@ -326,7 +326,7 @@ class WindowGroupManager:
             self._active_group_id = None
             self._window_counter = 0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert manager state to dictionary."""
         with self._lock:
             return {

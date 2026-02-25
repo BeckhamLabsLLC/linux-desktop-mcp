@@ -110,7 +110,7 @@ class YdotoolBackend(InputBackend):
                 logger.error(f"ydotool error: {stderr.decode()}")
                 return False
             return True
-        except Exception as e:
+        except (FileNotFoundError, OSError) as e:
             logger.error(f"ydotool failed: {e}")
             return False
 
@@ -171,7 +171,7 @@ class XdotoolBackend(InputBackend):
                 logger.error(f"xdotool error: {stderr.decode()}")
                 return False
             return True
-        except Exception as e:
+        except (FileNotFoundError, OSError) as e:
             logger.error(f"xdotool failed: {e}")
             return False
 
@@ -233,7 +233,7 @@ class WtypeBackend(InputBackend):
                 logger.error(f"wtype error: {stderr.decode()}")
                 return False
             return True
-        except Exception as e:
+        except (FileNotFoundError, OSError) as e:
             logger.error(f"wtype failed: {e}")
             return False
 

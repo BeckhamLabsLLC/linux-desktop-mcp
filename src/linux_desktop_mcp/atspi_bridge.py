@@ -10,10 +10,20 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
+from .exceptions import ATSPINotAvailableError
+
 logger = logging.getLogger(__name__)
 
 # AT-SPI role to ElementRole mapping
 ROLE_MAPPING: dict[int, str] = {}
+
+# Conditional GLib.Error import for narrow exception catching
+try:
+    from gi.repository import GLib as _GLib
+
+    _GLibError: type[Exception] = _GLib.Error
+except ImportError:
+    _GLibError = Exception
 
 try:
     import gi
@@ -96,7 +106,7 @@ def _get_role_from_atspi(atspi_role: int) -> ElementRole:
         return ElementRole.UNKNOWN
 
 
-def _get_state_from_atspi(state_set) -> ElementState:
+def _get_state_from_atspi(state_set: Any) -> ElementState:
     """Extract ElementState from AT-SPI StateSet."""
     if not ATSPI_AVAILABLE:
         return ElementState()
@@ -122,21 +132,21 @@ def _get_state_from_atspi(state_set) -> ElementState:
     )
 
 
-def _get_bounds_from_atspi(accessible) -> ElementBounds:
+def _get_bounds_from_atspi(accessible: Any) -> ElementBounds:
     """Get element bounds from AT-SPI accessible."""
     try:
         component = accessible.get_component_iface()
         if component:
             rect = component.get_extents(Atspi.CoordType.SCREEN)
             return ElementBounds(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
-    except Exception:
+    except _GLibError:
         pass
     return ElementBounds(x=0, y=0, width=0, height=0)
 
 
-def _get_available_actions(accessible) -> list[str]:
+def _get_available_actions(accessible: Any) -> list[str]:
     """Get available actions for an accessible element."""
-    actions = []
+    actions: list[str] = []
     try:
         action_iface = accessible.get_action_iface()
         if action_iface:
@@ -145,12 +155,12 @@ def _get_available_actions(accessible) -> list[str]:
                 action_name = action_iface.get_action_name(i)
                 if action_name:
                     actions.append(action_name)
-    except Exception:
+    except _GLibError:
         pass
     return actions
 
 
-def _get_element_value(accessible) -> Optional[str]:
+def _get_element_value(accessible: Any) -> Optional[str]:
     """Get the current value of an element if applicable."""
     try:
         value_iface = accessible.get_value_iface()
@@ -162,7 +172,7 @@ def _get_element_value(accessible) -> Optional[str]:
             char_count = text_iface.get_character_count()
             if char_count > 0:
                 return text_iface.get_text(0, min(char_count, 1000))
-    except Exception:
+    except _GLibError:
         pass
     return None
 
@@ -173,9 +183,11 @@ class ATSPIBridge:
     Provides thread-safe async access to pyatspi operations.
     """
 
-    def __init__(self, max_workers: int = 4):
+    def __init__(self, max_workers: int = 4) -> None:
         if not ATSPI_AVAILABLE:
-            raise RuntimeError("AT-SPI2 is not available. Install python3-pyatspi gir1.2-atspi-2.0")
+            raise ATSPINotAvailableError(
+                "AT-SPI2 is not available. Install python3-pyatspi gir1.2-atspi-2.0"
+            )
 
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._lock = threading.Lock()
@@ -186,45 +198,45 @@ class ATSPIBridge:
         """Get the reference manager."""
         return self._ref_manager
 
-    async def _run_sync(self, func: Callable, *args) -> Any:
+    async def _run_sync(self, func: Callable[..., Any], *args: Any) -> Any:
         """Run a synchronous function in the thread pool."""
         loop = asyncio.get_event_loop()
 
-        def _wrapped():
+        def _wrapped() -> Any:
             with self._lock:
                 return func(*args)
 
         return await loop.run_in_executor(self._executor, _wrapped)
 
-    def _get_desktop_sync(self):
+    def _get_desktop_sync(self) -> Any:
         """Get the desktop accessible (sync)."""
         return Atspi.get_desktop(0)
 
-    async def get_desktop(self):
+    async def get_desktop(self) -> Any:
         """Get the desktop accessible."""
         return await self._run_sync(self._get_desktop_sync)
 
-    def _get_applications_sync(self) -> list:
+    def _get_applications_sync(self) -> list[Any]:
         """Get all applications (sync)."""
         desktop = Atspi.get_desktop(0)
-        apps = []
+        apps: list[Any] = []
         if desktop:
             for i in range(desktop.get_child_count()):
                 try:
                     child = desktop.get_child_at_index(i)
                     if child:
                         apps.append(child)
-                except Exception:
+                except _GLibError:
                     pass
         return apps
 
-    async def get_applications(self) -> list:
+    async def get_applications(self) -> list[Any]:
         """Get all applications."""
         return await self._run_sync(self._get_applications_sync)
 
     def _build_tree_sync(
         self,
-        accessible,
+        accessible: Any,
         max_depth: int = 15,
         current_depth: int = 0,
         app_name: Optional[str] = None,
@@ -232,7 +244,7 @@ class ATSPIBridge:
         parent_ref: Optional[str] = None,
     ) -> list[ElementReference]:
         """Build element tree from accessible (sync)."""
-        refs = []
+        refs: list[ElementReference] = []
 
         if current_depth > max_depth:
             return refs
@@ -289,10 +301,10 @@ class ATSPIBridge:
                             if child_ref.parent_ref == ref_id:
                                 ref.child_refs.append(child_ref.ref_id)
                         refs.extend(child_refs)
-                except Exception as e:
+                except _GLibError as e:
                     logger.debug(f"Error traversing child {i}: {e}")
 
-        except Exception as e:
+        except _GLibError as e:
             logger.debug(f"Error building tree node: {e}")
 
         return refs
@@ -311,8 +323,8 @@ class ATSPIBridge:
         """
         self._ref_manager.clear()
 
-        def _build():
-            all_refs = []
+        def _build() -> list[ElementReference]:
+            all_refs: list[ElementReference] = []
             apps = self._get_applications_sync()
 
             for app in apps:
@@ -323,7 +335,7 @@ class ATSPIBridge:
 
                     refs = self._build_tree_sync(app, max_depth=max_depth)
                     all_refs.extend(refs)
-                except Exception as e:
+                except _GLibError as e:
                     logger.debug(f"Error processing app: {e}")
 
             return all_refs
@@ -331,7 +343,7 @@ class ATSPIBridge:
         return await self._run_sync(_build)
 
     async def build_tree_for_window(
-        self, window_accessible, max_depth: int = 15
+        self, window_accessible: Any, max_depth: int = 15
     ) -> list[ElementReference]:
         """Build accessibility tree for a specific window only.
 
@@ -347,7 +359,7 @@ class ATSPIBridge:
         """
         self._ref_manager.clear()
 
-        def _build():
+        def _build() -> list[ElementReference]:
             try:
                 # Get app name from parent application
                 app_name = ""
@@ -355,7 +367,7 @@ class ATSPIBridge:
                     app = window_accessible.get_application()
                     if app:
                         app_name = app.get_name() or ""
-                except Exception:
+                except _GLibError:
                     pass
 
                 window_title = window_accessible.get_name() or ""
@@ -366,14 +378,14 @@ class ATSPIBridge:
                     app_name=app_name,
                     window_title=window_title,
                 )
-            except Exception as e:
+            except _GLibError as e:
                 logger.error(f"Error building tree for window: {e}")
                 return []
 
         return await self._run_sync(_build)
 
     async def build_tree_for_windows(
-        self, window_accessibles: list, max_depth: int = 15
+        self, window_accessibles: list[Any], max_depth: int = 15
     ) -> list[ElementReference]:
         """Build accessibility tree for multiple windows.
 
@@ -386,8 +398,8 @@ class ATSPIBridge:
         """
         self._ref_manager.clear()
 
-        def _build():
-            all_refs = []
+        def _build() -> list[ElementReference]:
+            all_refs: list[ElementReference] = []
             for window_accessible in window_accessibles:
                 try:
                     # Get app name from parent application
@@ -396,7 +408,7 @@ class ATSPIBridge:
                         app = window_accessible.get_application()
                         if app:
                             app_name = app.get_name() or ""
-                    except Exception:
+                    except _GLibError:
                         pass
 
                     window_title = window_accessible.get_name() or ""
@@ -408,13 +420,13 @@ class ATSPIBridge:
                         window_title=window_title,
                     )
                     all_refs.extend(refs)
-                except Exception as e:
+                except _GLibError as e:
                     logger.debug(f"Error processing window: {e}")
             return all_refs
 
         return await self._run_sync(_build)
 
-    def _click_element_sync(self, accessible, button: str = "left") -> bool:
+    def _click_element_sync(self, accessible: Any, button: str = "left") -> bool:
         """Click an element using AT-SPI action interface (sync)."""
         try:
             action_iface = accessible.get_action_iface()
@@ -429,7 +441,7 @@ class ATSPIBridge:
             if component:
                 return component.grab_focus()
 
-        except Exception as e:
+        except _GLibError as e:
             logger.error(f"Error clicking element: {e}")
 
         return False
@@ -449,13 +461,13 @@ class ATSPIBridge:
 
         return await self._run_sync(self._click_element_sync, ref.atspi_accessible, button)
 
-    def _focus_element_sync(self, accessible) -> bool:
+    def _focus_element_sync(self, accessible: Any) -> bool:
         """Focus an element (sync)."""
         try:
             component = accessible.get_component_iface()
             if component:
                 return component.grab_focus()
-        except Exception as e:
+        except _GLibError as e:
             logger.error(f"Error focusing element: {e}")
         return False
 
@@ -466,7 +478,7 @@ class ATSPIBridge:
 
         return await self._run_sync(self._focus_element_sync, ref.atspi_accessible)
 
-    def _set_text_sync(self, accessible, text: str, clear_first: bool = True) -> bool:
+    def _set_text_sync(self, accessible: Any, text: str, clear_first: bool = True) -> bool:
         """Set text in an editable element (sync)."""
         try:
             editable = accessible.get_editable_text_iface()
@@ -479,7 +491,7 @@ class ATSPIBridge:
                             editable.delete_text(0, char_count)
 
                 return editable.insert_text(0, text, len(text))
-        except Exception as e:
+        except _GLibError as e:
             logger.error(f"Error setting text: {e}")
         return False
 
@@ -499,7 +511,7 @@ class ATSPIBridge:
 
         return await self._run_sync(self._set_text_sync, ref.atspi_accessible, text, clear_first)
 
-    def _get_element_at_point_sync(self, x: int, y: int):
+    def _get_element_at_point_sync(self, x: int, y: int) -> Optional[Any]:
         """Get element at screen coordinates (sync)."""
         desktop = Atspi.get_desktop(0)
         if not desktop:
@@ -514,7 +526,7 @@ class ATSPIBridge:
                         accessible = component.get_accessible_at_point(x, y, Atspi.CoordType.SCREEN)
                         if accessible:
                             return accessible
-            except Exception:
+            except _GLibError:
                 pass
         return None
 
@@ -535,7 +547,7 @@ class ATSPIBridge:
                 return refs[0]
         return None
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Shutdown the bridge and cleanup resources."""
         self._executor.shutdown(wait=True)
         self._ref_manager.clear()
